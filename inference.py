@@ -1,24 +1,19 @@
 import torch
-import librosa
-from args import *
+from transformers import LlamaTokenizer
 
-
-
-def summarize_audio(audio_path):
-    audio, _ = librosa.load(audio_path, sr=16000)
-    inputs = processor(audio, return_tensors="pt", sampling_rate=16000)
+def infer(model, audio_input, tokenizer):
+    model.eval()
     with torch.no_grad():
-        features = processor(audio, return_tensors='pt').input_values.squeeze(0)
-        features = torch.tensor(features).unsqueeze(0)  
-        audio_features = s_encoder.extract_features(features)
-    compressed_features = q_former(audio_features)
-    input_ids = compressed_features
-    summary_ids = llama2_model.generate(input_ids=input_ids, max_length=150, num_beams=4, early_stopping=True)
-    summary = llama2_tokenizer.decode(summary_ids[0], skip_special_tokens=True)
-    
-    return summary
+        logits = model(audio_input)
+        # Generate text from logits
+        predicted_ids = torch.argmax(logits, dim=-1)
+        generated_text = tokenizer.decode(predicted_ids[0], skip_special_tokens=True)
+        return generated_text
+
+# Example usage
 
 
-audio_file_path = ''
-summary = summarize_audio(audio_file_path)
-print("Summary:", summary)
+# Inference example
+audio_input = torch.randn(1, 16000 * 30)  # Dummy audio input
+generated_text = infer(model, audio_input, LlamaTokenizer.from_pretrained('huggingface/llama'))
+print(f"Generated Text: {generated_text}")

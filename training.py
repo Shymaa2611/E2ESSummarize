@@ -1,39 +1,50 @@
 import torch
-from args import *
-from validation import validate
+from torch.utils.data import DataLoader
+from dataset import SpeechSummarizationDataset
+from model import SpeechToTextSummarizer
 
-def train(model):
-    train_losses = []
-    for epoch in range(num_epoch):
+def train(model, dataset, optimizer, criterion, num_epochs=5):
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=4)
+    model
+
+    for epoch in range(num_epochs):
         model.train()
-        epoch_loss = 0
-        for batch in train_loader:
-            audio = batch['audio']
-            summaries = batch['summary']
-            
+        running_loss = 0.0
+
+        for segments, input_ids, attention_mask in dataloader:
+            segments = segments
+            input_ids = input_ids
+            attention_mask = attention_mask
+
             optimizer.zero_grad()
-            outputs = model(audio, summary=summaries)
-            loss = outputs.loss
-            loss.backward()
-            optimizer.step()
-            
-            epoch_loss += loss.item()
-        
-        avg_loss = epoch_loss / len(train_loader)
-        train_losses.append(avg_loss)
-        print(f"Epoch {epoch+1}/{num_epoch}, Loss: {avg_loss}")
-    return train_losses
 
-def main():
-  checkpoint_dir = 'checkpoint'
-  if not os.path.exists(checkpoint_dir):
-        os.makedirs(checkpoint_dir)
-  for epoch in range(num_epoch):
-     train(e2e_model, train_loader, optimizer, criterion)
-     val_loss = validate(e2e_model,val_loader)
-     print(f"Epoch {epoch+1}, Validation Loss: {val_loss}")
-  checkpoint_path = os.path.join(checkpoint_dir,"model.pt")
-  torch.save(e2e_model.state_dict(), checkpoint_path)
+            # Forward pass through each segment
+            for segment in segments:
+                segment = segment.unsqueeze(0) # Add batch dimension
+                outputs = model(segment)
+                
+                # Compute loss (dummy loss for illustration)
+                # In practice, you should compute loss based on your specific requirements
+                loss = criterion(outputs.view(-1, outputs.size(-1)), input_ids.view(-1))
+                loss.backward()
+                optimizer.step()
+                
+                running_loss += loss.item()
 
-if __name__=="__main__":
-    main()
+        print(f"Epoch {epoch+1}/{num_epochs}, Loss: {running_loss / len(dataloader)}")
+
+if __name__ == "__main__":
+    # Define paths to your data directories
+    speech_dir = 'data//audio'
+    text_dir = 'data//summary'
+    
+    # Initialize dataset and model
+    dataset = SpeechSummarizationDataset(speech_dir, text_dir)
+    model = SpeechToTextSummarizer()
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+    criterion = torch.nn.CrossEntropyLoss()  # Adjust as needed
+
+    # Train the model
+    train(model, dataset, optimizer, criterion)
+
+    

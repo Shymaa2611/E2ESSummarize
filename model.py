@@ -1,10 +1,11 @@
 import torch
-import torch.nn as nn
-from transformers import Wav2Vec2Model, Wav2Vec2Processor, AutoModelForCausalLM, AutoTokenizer
+from torch import nn
+from transformers import Wav2Vec2Processor, Wav2Vec2Model, LlamaForCausalLM, LlamaTokenizer
+from peft import LoraConfig, get_peft_model
 
-class SEncoder(nn.Module):
+class SpeechEncoder(nn.Module):
     def __init__(self, model_name='facebook/wav2vec2-base-960h'):
-        super(SEncoder, self).__init__()
+        super(SpeechEncoder, self).__init__()
         self.processor = Wav2Vec2Processor.from_pretrained(model_name)
         self.model = Wav2Vec2Model.from_pretrained(model_name)
     
@@ -15,39 +16,54 @@ class SEncoder(nn.Module):
         return outputs.last_hidden_state
 
 class QFormer(nn.Module):
-    def __init__(self, input_dim, output_dim):
+    def __init__(self, hidden_size, num_attention_heads, num_layers):
         super(QFormer, self).__init__()
-        self.fc = nn.Linear(input_dim, output_dim)
-        self.relu = nn.ReLU()
+        self.transformer = nn.Transformer(
+            d_model=hidden_size, 
+            nhead=num_attention_heads, 
+            num_encoder_layers=num_layers,
+            num_decoder_layers=num_layers
+        )
     
     def forward(self, x):
-        x = self.fc(x)
-        x = self.relu(x)
-        return x
+        # x: (batch_size, seq_len, hidden_size)
+        x = x.permute(1, 0, 2)  # Transformer expects (seq_len, batch_size, hidden_size)
+        output = self.transformer(x, x)
+        output = output.permute(1, 0, 2)  # Convert back to (batch_size, seq_len, hidden_size)
+        return output
 
-class LLaMA2WithLoRA(nn.Module):
-    def __init__(self, model_name='huggyllama/llama-7b'):
-        super(LLaMA2WithLoRA, self).__init__()
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForCausalLM.from_pretrained(model_name)
+class SpeechToTextSummarizer(nn.Module):
+    def __init__(self, llama_model_name='huggingface/llama-7b', 
+                 hidden_size=768, num_attention_heads=12, num_layers=6):
+        super(SpeechToTextSummarizer, self).__init__()
+        # Initialize the Speech Encoder
+        self.speech_encoder = SpeechEncoder()
         
-    def forward(self, input_ids, attention_mask=None, labels=None):
-        outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
-        return outputs
+        # Q-Former to refine speech features
+        self.q_former = QFormer(hidden_size=hidden_size, num_attention_heads=num_attention_heads, num_layers=num_layers)
+        
+        # Load pre-trained LLaMA model and tokenizer with LoRA adaptation
+        self.text_tokenizer = LlamaTokenizer.from_pretrained(llama_model_name)
+        llama_model = LlamaForCausalLM.from_pretrained(llama_model_name)
 
-class E2ESpeechSummarization(nn.Module):
-    def __init__(self, s_encoder, q_former, llama2):
-        super(E2ESpeechSummarization, self).__init__()
-        self.s_encoder = s_encoder
-        self.q_former = q_former
-        self.llama2 = llama2
+        # Configure LoRA
+        lora_config = LoraConfig(
+            r=8,
+            lora_alpha=32,
+            target_modules=["q_proj", "v_proj"],
+            lora_dropout=0.1,
+            bias="none",
+            task_type="CAUSAL_LM"
+        )
+        self.text_generator = get_peft_model(llama_model, lora_config)
     
     def forward(self, audio_input):
-        audio_features = self.s_encoder(audio_input)
-        compressed_features = self.q_former(audio_features)
-        inputs = compressed_features.squeeze(0) 
-        input_ids = inputs.long() 
-        summary_ids = self.llama2.model.generate(input_ids=input_ids, max_length=150, num_beams=4, early_stopping=True)
-        summary = self.llama2.tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+        speech_features = self.speech_encoder(audio_input)
+        refined_features = self.q_former(speech_features)
+    
+        # Generate text with LLaMA model
+        input_ids = self.text_tokenizer("<s>", return_tensors="pt").input_ids
+        # Pass encoder hidden states (speech features) to the text generator
+        gpt_output = self.text_generator(input_ids=input_ids, encoder_hidden_states=refined_features)
         
-        return summary
+        return gpt_output.logits
