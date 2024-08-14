@@ -1,43 +1,46 @@
 import torch
-import os
+import torch.nn  as nn
 
-def train(model, train_loader, optimizer, criterion, num_epochs=5, checkpoint_dir='checkpoint', device='cpu'):
-    model.to(device)
-    
-    for epoch in range(num_epochs):
-        model.train()
-        running_loss = 0.0
-        
-        for segments, input_ids, attention_mask in train_loader:
-            segments = [seg.to(device) for seg in segments]
-            input_ids = input_ids.to(device)
-            attention_mask = attention_mask.to(device)
-            features = [model.speech_encoder(segment.unsqueeze(0)) for segment in segments]
-            concatenated_features = torch.cat(features, dim=1)
+def train_sentence_level_asr(model, data_loader, optimizer):
+    model.train()
+    for batch in data_loader:
+        audio_input = batch['audio_input']
+        optimizer.zero_grad()
+        output_logits = model(audio_input)
+        loss = compute_loss(output_logits, batch['labels'])
+        loss.backward()
+        optimizer.step()
 
-            optimizer.zero_grad()
-            
-            # Forward pass
-            outputs = model(concatenated_features)
-            
-            # Calculate loss
-            loss = criterion(outputs.view(-1, outputs.size(-1)), input_ids.view(-1))
-            loss.backward()
-            optimizer.step()
-            
-            running_loss += loss.item()
-        avg_loss = running_loss / len(train_loader)
-        print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {avg_loss}")
-    if not os.path.exists(checkpoint_dir):
-        os.makedirs(checkpoint_dir)
-    
-    checkpoint_path = os.path.join(checkpoint_dir, 'checkpoint.pth')
-    torch.save({
-        'epoch': num_epochs,
-        'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict(),
-        'loss': avg_loss,
-    }, checkpoint_path)
-    print(f'checkpoint saved to {checkpoint_path}')
+def train_document_level_asr(model, data_loader, optimizer):
+    model.train()
+    for batch in data_loader:
+        audio_input = batch['audio_input']
+        transcription_features = batch['transcription_features']
+        optimizer.zero_grad()
+        output_logits = model(audio_input)
+        loss = compute_loss(output_logits, transcription_features)
+        loss.backward()
+        optimizer.step()
 
-    print('Training complete.')
+
+def train_end_to_end_summarization(model, data_loader, optimizer):
+    model.train()
+    for batch in data_loader:
+        audio_input = batch['audio_input']
+        optimizer.zero_grad()
+        output_logits = model(audio_input)
+        loss = compute_loss(output_logits, batch['summarization_labels'])
+        loss.backward()
+        optimizer.step()
+
+def compute_loss(output_logits, labels):
+    return nn.CrossEntropyLoss()(output_logits.view(-1, output_logits.size(-1)), labels.view(-1))
+def setup_training(model):
+    optimizer = torch.optim.Adam(model.parameters(), lr=2e-4)
+    return optimizer
+
+def train_model(model, data_loaders):
+    optimizer = setup_training(model)    
+    train_sentence_level_asr(model, data_loaders['sentence_asr'], optimizer)
+    train_document_level_asr(model, data_loaders['document_asr'], optimizer)
+    train_end_to_end_summarization(model, data_loaders['summarization'], optimizer)
