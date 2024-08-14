@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from utility import *
 
 def train_sentence_level_asr(model, data_loader, optimizer):
     model.train()
@@ -32,18 +33,13 @@ def train_end_to_end_summarization(model, data_loader, optimizer):
         loss.backward()
         optimizer.step()
 
-# 
-def compute_loss(output_logits, labels):
-    return nn.CrossEntropyLoss()(output_logits.view(-1, output_logits.size(-1)), labels.view(-1))
 
-
-def setup_training(model):
-    optimizer = torch.optim.Adam(model.parameters(), lr=2e-4)
-    return optimizer
-
-def train_model(model, data_loaders):
+def train_model(model, data_loaders, num_epochs, checkpoint_folder='checkpoint'):
     optimizer = setup_training(model)
-    train_sentence_level_asr(model, data_loaders['sentence_asr'], optimizer)
-    train_document_level_asr(model, data_loaders['document_asr'], optimizer)
+    for epoch in range(num_epochs):
+        print(f"Epoch {epoch+1}/{num_epochs}")
+        train_sentence_level_asr(model, data_loaders['sentence_asr'], optimizer)
+        train_document_level_asr(model, data_loaders['document_asr'], optimizer)
+        train_end_to_end_summarization(model, data_loaders['summarization'], optimizer)
+        save_model(model, optimizer, folder_path=checkpoint_folder)
 
-    train_end_to_end_summarization(model, data_loaders['summarization'], optimizer)

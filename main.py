@@ -1,24 +1,25 @@
-from args import *
-from dataset import SpeechSummarizationDataset,split_dataset
+from dataset import SpeechDataset,get_data_loaders
 from torch.utils.data import DataLoader
-from training import train
-
-def main(speech_dir,summary_dir):
-    dataset = SpeechSummarizationDataset(speech_dir, summary_dir)
-    train_dataset, val_dataset = split_dataset(dataset, train_size=0.8)
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=4)
-    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False, num_workers=4)
-    train(model, train_loader, val_loader, optimizer, criterion)
-    
+from model import SpeechToTextSummarizer
+from utility import load_model,setup_training
+from training import train_model
 
 
+
+def main(audio_dir,text_dir,summary_dir):
+      # Example usage
+   model = SpeechToTextSummarizer()
+   optimizer = setup_training(model)
+   checkpoint_folder = 'checkpoint'
+   load_model(model, optimizer, folder_path=checkpoint_folder)
+   num_epochs = 10  
+   data_loaders,_=get_data_loaders(audio_dir,text_dir,summary_dir)
+   train_model(model, data_loaders, num_epochs, checkpoint_folder=checkpoint_folder)
+ 
 
 if __name__ == "__main__":
-
-    speech_dir = 'data/audio'
-    summary_dir = 'data/summary'
-    main()
-   
-  
-  
+      audio_dir="data//audio"
+      text_dir="data//text"
+      summary_dir="data//summary"
+      main(audio_dir,text_dir,summary_dir)
     

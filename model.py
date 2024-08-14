@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from transformers import Wav2Vec2Processor, Wav2Vec2Model, LlamaForCausalLM, LlamaTokenizer, BertModel
+from transformers import Wav2Vec2Processor, Wav2Vec2Model, LlamaForCausalLM, LlamaTokenizer
 from peft import LoraConfig, get_peft_model
 
 class SEncoder(nn.Module):

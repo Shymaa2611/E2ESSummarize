@@ -26,12 +26,8 @@ class SpeechDataset(Dataset):
         audio_path = os.path.join(self.audio_dir, self.audio_files[idx])
         text_path = os.path.join(self.text_dir, self.text_files[idx])
         summary_path = os.path.join(self.summary_dir, self.summary_files[idx])
-        
-        # Load and process audio
         audio = AudioSegment.from_wav(audio_path)
         audio_input = self.processor(audio.get_array_of_samples(), sampling_rate=audio.frame_rate, return_tensors="pt").input_values.squeeze()
-        
-        # Load text and summary
         with open(text_path, 'r') as f:
             text = f.read().strip()
         with open(summary_path, 'r') as f:
