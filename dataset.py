@@ -1,26 +1,39 @@
 import os
-import librosa
+import torchaudio
 from torch.utils.data import Dataset
 
-class AudioSummarizationDataset(Dataset):
-    def __init__(self, audio_dir, summary_dir):
-        self.audio_dir = audio_dir
-        self.summary_dir = summary_dir
-        self.audio_files = sorted(os.listdir(audio_dir))
-        self.summary_files = sorted(os.listdir(summary_dir))
+class SummarizeDataset(Dataset):
+    def __init__(self, text_folder, summary_folder, audio_folder):
+        self.text_folder = text_folder
+        self.summary_folder = summary_folder
+        self.audio_folder = audio_folder
+        self.texts = self.load_files(text_folder)
+        self.summaries = self.load_files(summary_folder)
+        self.audio_files = self.load_audio_files(audio_folder)
+        self.common_files = set(self.texts.keys()) & set(self.summaries.keys()) & set(self.audio_files.keys())
+    
+    def load_files(self, folder):
+        files = {}
+        for filename in os.listdir(folder):
+            if filename.endswith(".txt"):
+                with open(os.path.join(folder, filename), 'r') as file:
+                    files[filename] = file.read().strip()
+        return files
+    
+    def load_audio_files(self, folder):
+        files = {}
+        for filename in os.listdir(folder):
+            if filename.endswith(".wav"):
+                waveform, sample_rate = torchaudio.load(os.path.join(folder, filename))
+                files[filename] = (waveform, sample_rate)
+        return files
     
     def __len__(self):
-        return len(self.audio_files)
+        return len(self.common_files)
     
     def __getitem__(self, idx):
-        audio_path = os.path.join(self.audio_dir, self.audio_files[idx])
-        summary_path = os.path.join(self.summary_dir, self.summary_files[idx])
-        audio, _ = librosa.load(audio_path, sr=16000)
-        with open(summary_path, 'r') as file:
-            summary = file.read().strip()
-        
-        return {'audio': audio, 'summary': summary}
-
-
-dataset = AudioSummarizationDataset('data/audio',  'data/summary')
-
+        filename = list(self.common_files)[idx]
+        text = self.texts[filename]
+        summary = self.summaries[filename]
+        waveform, sample_rate = self.audio_files[filename]
+        return text, summary, waveform, sample_rate
