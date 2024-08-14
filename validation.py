@@ -2,8 +2,9 @@ import torch
 from args import *
 
 def validate(model,val_loader):
-        model.eval()
-        val_loss = 0.0
+    model.eval()
+    val_loss = 0.0
+    for epoch in range(num_epochs):
         with torch.no_grad():
             for segments, input_ids, attention_mask in val_loader:
                 segments = segments.squeeze(0)
