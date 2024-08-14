@@ -1,50 +1,43 @@
 import torch
-from torch.utils.data import DataLoader
-from dataset import SpeechSummarizationDataset
-from model import SpeechToTextSummarizer
+import os
 
-def train(model, dataset, optimizer, criterion, num_epochs=5):
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=4)
-    model
-
+def train(model, train_loader, optimizer, criterion, num_epochs=5, checkpoint_dir='checkpoint', device='cpu'):
+    model.to(device)
+    
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
-
-        for segments, input_ids, attention_mask in dataloader:
-            segments = segments
-            input_ids = input_ids
-            attention_mask = attention_mask
+        
+        for segments, input_ids, attention_mask in train_loader:
+            segments = [seg.to(device) for seg in segments]
+            input_ids = input_ids.to(device)
+            attention_mask = attention_mask.to(device)
+            features = [model.speech_encoder(segment.unsqueeze(0)) for segment in segments]
+            concatenated_features = torch.cat(features, dim=1)
 
             optimizer.zero_grad()
-
-            # Forward pass through each segment
-            for segment in segments:
-                segment = segment.unsqueeze(0) # Add batch dimension
-                outputs = model(segment)
-                
-                # Compute loss (dummy loss for illustration)
-                # In practice, you should compute loss based on your specific requirements
-                loss = criterion(outputs.view(-1, outputs.size(-1)), input_ids.view(-1))
-                loss.backward()
-                optimizer.step()
-                
-                running_loss += loss.item()
-
-        print(f"Epoch {epoch+1}/{num_epochs}, Loss: {running_loss / len(dataloader)}")
-
-if __name__ == "__main__":
-    # Define paths to your data directories
-    speech_dir = 'data//audio'
-    text_dir = 'data//summary'
+            
+            # Forward pass
+            outputs = model(concatenated_features)
+            
+            # Calculate loss
+            loss = criterion(outputs.view(-1, outputs.size(-1)), input_ids.view(-1))
+            loss.backward()
+            optimizer.step()
+            
+            running_loss += loss.item()
+        avg_loss = running_loss / len(train_loader)
+        print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {avg_loss}")
+    if not os.path.exists(checkpoint_dir):
+        os.makedirs(checkpoint_dir)
     
-    # Initialize dataset and model
-    dataset = SpeechSummarizationDataset(speech_dir, text_dir)
-    model = SpeechToTextSummarizer()
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
-    criterion = torch.nn.CrossEntropyLoss()  # Adjust as needed
+    checkpoint_path = os.path.join(checkpoint_dir, 'checkpoint.pth')
+    torch.save({
+        'epoch': num_epochs,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'loss': avg_loss,
+    }, checkpoint_path)
+    print(f'checkpoint saved to {checkpoint_path}')
 
-    # Train the model
-    train(model, dataset, optimizer, criterion)
-
-    
+    print('Training complete.')

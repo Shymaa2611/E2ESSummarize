@@ -12,7 +12,7 @@ class SpeechSummarizationDataset(Dataset):
         self.sample_rate = sample_rate
         self.overlap = overlap
         self.audio_files = [f for f in os.listdir(speech_dir) if f.endswith('.mp3')]
-        self.tokenizer = LlamaTokenizer.from_pretrained("huggingface/llama") 
+        self.tokenizer = LlamaTokenizer.from_pretrained("huggyllama/llama-7b") 
 
     def __len__(self):
         return len(self.audio_files)

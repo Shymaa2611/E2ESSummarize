@@ -32,12 +32,12 @@ class QFormer(nn.Module):
         return output
 
 class SpeechToTextSummarizer(nn.Module):
-    def __init__(self, llama_model_name='huggingface/llama-7b', 
+    def __init__(self, llama_model_name='huggyllama/llama-7b', 
                  hidden_size=768, num_attention_heads=12, num_layers=6):
         super(SpeechToTextSummarizer, self).__init__()
         self.speech_encoder = SpeechEncoder()
         self.q_former = QFormer(hidden_size=hidden_size, num_attention_heads=num_attention_heads, num_layers=num_layers)
-        self.text_tokenizer = LlamaTokenizer.from_pretrained(llama_model_name)
+        self.text_tokenizer = LlamaTokenizer.from_pretrained(llama_model_name,legacy=False)
         llama_model = LlamaForCausalLM.from_pretrained(llama_model_name)
         lora_config = LoraConfig(
             r=8,
@@ -56,3 +56,5 @@ class SpeechToTextSummarizer(nn.Module):
         gpt_output = self.text_generator(input_ids=input_ids, encoder_hidden_states=refined_features)
         
         return gpt_output.logits
+
+#model = SpeechToTextSummarizer()
