@@ -26,27 +26,19 @@ class QFormer(nn.Module):
         )
     
     def forward(self, x):
-        # x: (batch_size, seq_len, hidden_size)
-        x = x.permute(1, 0, 2)  # Transformer expects (seq_len, batch_size, hidden_size)
+        x = x.permute(1, 0, 2)  
         output = self.transformer(x, x)
-        output = output.permute(1, 0, 2)  # Convert back to (batch_size, seq_len, hidden_size)
+        output = output.permute(1, 0, 2)  
         return output
 
 class SpeechToTextSummarizer(nn.Module):
     def __init__(self, llama_model_name='huggingface/llama-7b', 
                  hidden_size=768, num_attention_heads=12, num_layers=6):
         super(SpeechToTextSummarizer, self).__init__()
-        # Initialize the Speech Encoder
         self.speech_encoder = SpeechEncoder()
-        
-        # Q-Former to refine speech features
         self.q_former = QFormer(hidden_size=hidden_size, num_attention_heads=num_attention_heads, num_layers=num_layers)
-        
-        # Load pre-trained LLaMA model and tokenizer with LoRA adaptation
         self.text_tokenizer = LlamaTokenizer.from_pretrained(llama_model_name)
         llama_model = LlamaForCausalLM.from_pretrained(llama_model_name)
-
-        # Configure LoRA
         lora_config = LoraConfig(
             r=8,
             lora_alpha=32,
@@ -60,10 +52,7 @@ class SpeechToTextSummarizer(nn.Module):
     def forward(self, audio_input):
         speech_features = self.speech_encoder(audio_input)
         refined_features = self.q_former(speech_features)
-    
-        # Generate text with LLaMA model
         input_ids = self.text_tokenizer("<s>", return_tensors="pt").input_ids
-        # Pass encoder hidden states (speech features) to the text generator
         gpt_output = self.text_generator(input_ids=input_ids, encoder_hidden_states=refined_features)
         
         return gpt_output.logits
