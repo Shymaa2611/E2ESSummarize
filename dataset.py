@@ -25,6 +25,7 @@ class SpeechDataset(Dataset):
         audio_path = os.path.join(self.audio_dir, self.audio_files[idx])
         text_path = os.path.join(self.text_dir, self.text_files[idx])
         summary_path = os.path.join(self.summary_dir, self.summary_files[idx])
+        
         try:
             audio = AudioSegment.from_mp3(audio_path)
             audio = audio.set_frame_rate(16000)
@@ -45,6 +46,7 @@ class SpeechDataset(Dataset):
                                          sampling_rate=16000,
                                          return_tensors="pt").input_values.squeeze(0)
             audio_inputs.append(audio_input)
+        
         audio_inputs = torch.cat(audio_inputs, dim=0)
         
         try:
@@ -78,7 +80,7 @@ def collate_fn(batch):
         'summaries': summaries
     }
 
-def get_data_loaders(batch_size=8, shuffle=True, audio_dir='data/audio', text_dir='data/text', summary_dir='data/summary', validation_split=0.2, verbose=False):
+def get_data_loaders(batch_size=8, shuffle=True, audio_dir='data/audio', text_dir='data/text', summary_dir='data/summary', validation_split=0.2):
     dataset = SpeechDataset(audio_dir=audio_dir, text_dir=text_dir, summary_dir=summary_dir)
     dataset_size = len(dataset)
     val_size = max(int(validation_split * dataset_size), 1)
@@ -92,15 +94,11 @@ def get_data_loaders(batch_size=8, shuffle=True, audio_dir='data/audio', text_di
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_fn)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_fn)
     
-    if verbose:
-        print(f"Training set size: {train_size}, Validation set size: {val_size}")
-    
     return train_loader, val_loader
 
-train_loader, val_loader = get_data_loaders(verbose=True)
+train_loader, val_loader = get_data_loaders()
 
-for i, data in enumerate(train_loader):
-    if data is None:
-        print(f"Skipping batch {i} due to errors in data loading.")
-    else:
-        print(f"Batch {i}: {data}")
+
+for data in train_loader:
+    if data:
+        print(data) 
