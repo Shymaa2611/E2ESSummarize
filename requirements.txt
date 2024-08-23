@@ -3,3 +3,4 @@ torchaudio
 sentencepiece
 peft
 transformers
+pydub
