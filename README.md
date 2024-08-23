@@ -9,7 +9,7 @@
 
 
 ## Dataset
-
+  -  can download from https://www.kaggle.com/datasets/nfedorov/audio-summarization/data
 
 
 
