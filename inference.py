@@ -30,7 +30,6 @@ def infer(model, audio_input, tokenizer, segment_duration=15, overlap=0.5):
         logits = model(concatenated_features)
         predicted_ids = torch.argmax(logits, dim=-1)
         generated_text = tokenizer.decode(predicted_ids[0], skip_special_tokens=True)
-        
         return generated_text
 
 

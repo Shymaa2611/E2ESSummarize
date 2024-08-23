@@ -15,6 +15,7 @@ class SEncoder(nn.Module):
             outputs = self.model(**inputs)
         return outputs.last_hidden_state 
     
+
 class QFormer(nn.Module):
     def __init__(self, hidden_size, num_attention_heads, num_layers):
         super(QFormer, self).__init__()
@@ -32,6 +33,7 @@ class QFormer(nn.Module):
         output = output.permute(1, 0, 2)
         output = self.weighted_sum(output)  
         return output
+
 
 class SpeechToTextSummarizer(nn.Module):
     def __init__(self, llama_model_name='huggyllama/llama-7b', 

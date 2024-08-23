@@ -33,7 +33,6 @@ def train_end_to_end_summarization(model, data_loader, optimizer):
         loss.backward()
         optimizer.step()
 
-
 def train_model(model, data_loaders, num_epochs, checkpoint_folder='checkpoint'):
     optimizer = setup_training(model)
     for epoch in range(num_epochs):
