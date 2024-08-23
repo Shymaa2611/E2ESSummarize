@@ -5,31 +5,45 @@ from utility import *
 def train_sentence_level_asr(model, data_loader, optimizer):
     model.train()
     for batch in data_loader:
-        audio_input = batch['audio_input']
+        if batch is None:
+            continue
+
+        audio_inputs = batch['audio_inputs']
+        text_embeddings = batch['text_embeddings']
+
         optimizer.zero_grad()
-        output_logits = model(audio_input)
-        loss = compute_loss(output_logits, batch['labels'])
+        output_logits = model(audio_inputs)
+        loss = compute_loss(output_logits, text_embeddings)
         loss.backward()
         optimizer.step()
 
 def train_document_level_asr(model, data_loader, optimizer):
     model.train()
     for batch in data_loader:
-        audio_input = batch['audio_input']
-        transcription_features = batch['transcription_features']
+        if batch is None:
+            continue
+
+        audio_inputs = batch['audio_inputs']
+        summary_embeddings = batch['summary_embeddings']
+
         optimizer.zero_grad()
-        output_logits = model(audio_input)
-        loss = compute_loss(output_logits, transcription_features)
+        output_logits = model(audio_inputs)
+        loss = compute_loss(output_logits, summary_embeddings)
         loss.backward()
         optimizer.step()
 
 def train_end_to_end_summarization(model, data_loader, optimizer):
     model.train()
     for batch in data_loader:
-        audio_input = batch['audio_input']
+        if batch is None:
+            continue
+
+        audio_inputs = batch['audio_inputs']
+        summaries = batch['summaries'] 
+
         optimizer.zero_grad()
-        output_logits = model(audio_input)
-        loss = compute_loss(output_logits, batch['summarization_labels'])
+        output_logits = model(audio_inputs)
+        loss = compute_loss(output_logits, summaries)
         loss.backward()
         optimizer.step()
 
@@ -41,4 +55,3 @@ def train_model(model, data_loaders, num_epochs, checkpoint_folder='checkpoint')
         train_document_level_asr(model, data_loaders['document_asr'], optimizer)
         train_end_to_end_summarization(model, data_loaders['summarization'], optimizer)
         save_model(model, optimizer, folder_path=checkpoint_folder)
-
