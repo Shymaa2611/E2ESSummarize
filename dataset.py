@@ -5,6 +5,8 @@ from transformers import Wav2Vec2Processor
 from pydub import AudioSegment
 from torch.nn.utils.rnn import pad_sequence
 
+import numpy as np
+
 class SpeechDataset(Dataset):
     def __init__(self, audio_dir, text_dir, summary_dir, processor=None, segment_length=15):
         self.audio_dir = audio_dir
@@ -42,7 +44,8 @@ class SpeechDataset(Dataset):
         
         audio_inputs = []
         for segment in segments:
-            audio_input = self.processor(segment.get_array_of_samples(), 
+            samples = np.array(segment.get_array_of_samples())
+            audio_input = self.processor(samples, 
                                          sampling_rate=16000,
                                          return_tensors="pt").input_values.squeeze(0)
             audio_inputs.append(audio_input)
