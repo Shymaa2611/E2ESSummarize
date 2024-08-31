@@ -61,8 +61,6 @@ class SpeechDataset(Dataset):
         except Exception as e:
             print(f"Error loading text or summary file: {e}")
             return None
-        
-        # Tokenize and embed text and summary
         text_tokens = self.tokenizer(text, return_tensors='pt', padding=True, truncation=True)
         summary_tokens = self.tokenizer(summary, return_tensors='pt', padding=True, truncation=True)
         
@@ -74,7 +72,7 @@ class SpeechDataset(Dataset):
             'audio_inputs': audio_inputs, 
             'text': text,
             'summary': summary,
-            'text_embeddings': text_embeddings.squeeze(0),  # Removing batch dimension
+            'text_embeddings': text_embeddings.squeeze(0), 
             'summary_embeddings': summary_embeddings.squeeze(0)
         }
 
