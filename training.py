@@ -1,57 +1,70 @@
 import torch
-import torch.nn as nn
-from utility import *
+from model import SpeechToTextSummarizer
+import torch
+from torch import nn, optim
+from dataset import get_data_loaders
+from utility import save_model
 
-def train_sentence_level_asr(model, data_loader, optimizer):
+def stage_1_train(model, train_loader, optimizer, criterion, device):
     model.train()
-    for batch in data_loader:
-        if batch is None:
-            continue
-
-        audio_inputs = batch['audio_inputs']
-        text_embeddings = batch['text_embeddings']
-
+    for batch in train_loader:
+        audio_input, text_target = batch
+        audio_input = audio_input.to(device)
+        text_target = text_target.to(device)
+        
         optimizer.zero_grad()
-        output_logits = model(audio_inputs)
-        loss = compute_loss(output_logits, text_embeddings)
+        logits = model(audio_input)
+        loss = criterion(logits.view(-1, logits.size(-1)), text_target.view(-1))
         loss.backward()
         optimizer.step()
 
-def train_document_level_asr(model, data_loader, optimizer):
+def stage_2_train(model, train_loader, optimizer, criterion, device):
     model.train()
-    for batch in data_loader:
-        if batch is None:
-            continue
-
-        audio_inputs = batch['audio_inputs']
-        summary_embeddings = batch['summary_embeddings']
-
+    for batch in train_loader:
+        audio_input, text_target = batch
+        audio_input = audio_input.to(device)
+        text_target = text_target.to(device)
         optimizer.zero_grad()
-        output_logits = model(audio_inputs)
-        loss = compute_loss(output_logits, summary_embeddings)
+        audio_input = audio_input.flatten(1, 2)
+        logits = model(audio_input)
+        mask = (torch.rand_like(audio_input) > 0.15).float()
+        audio_input *= mask
+        
+        loss = criterion(logits.view(-1, logits.size(-1)), text_target.view(-1))
         loss.backward()
         optimizer.step()
 
-def train_end_to_end_summarization(model, data_loader, optimizer):
+def stage_3_train(model, train_loader, optimizer, criterion, device, curriculum_steps=10):
     model.train()
-    for batch in data_loader:
-        if batch is None:
-            continue
+    for step in range(curriculum_steps):
+        for batch in train_loader:
+            audio_input, text_target = batch
+            audio_input = audio_input.to(device)
+            text_target = text_target.to(device)
+            
+            optimizer.zero_grad()
+            
+            # Gradually remove text features
+            if step < curriculum_steps - 1:
+                logits = model(audio_input, text_input=text_target)
+            else:
+                logits = model(audio_input)
 
-        audio_inputs = batch['audio_inputs']
-        summaries = batch['summaries'] 
+            loss = criterion(logits.view(-1, logits.size(-1)), text_target.view(-1))
+            loss.backward()
+            optimizer.step()
 
-        optimizer.zero_grad()
-        output_logits = model(audio_inputs)
-        loss = compute_loss(output_logits, summaries)
-        loss.backward()
-        optimizer.step()
 
-def train_model(model, data_loaders, num_epochs, checkpoint_folder='checkpoint'):
-    optimizer = setup_training(model)
-    for epoch in range(num_epochs):
-        print(f"Epoch {epoch+1}/{num_epochs}")
-        train_sentence_level_asr(model, data_loaders['sentence_asr'], optimizer)
-        train_document_level_asr(model, data_loaders['document_asr'], optimizer)
-        train_end_to_end_summarization(model, data_loaders['summarization'], optimizer)
-        save_model(model, optimizer, folder_path=checkpoint_folder)
+def train():
+     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+     model = SpeechToTextSummarizer().to(device)
+     optimizer = optim.Adam(model.parameters(), lr=1e-4)
+     criterion = nn.CrossEntropyLoss()
+     train_loader,_=get_data_loaders()
+     stage_1_train(model, train_loader, optimizer, criterion, device)
+     stage_2_train(model, train_loader, optimizer, criterion, device)
+     stage_3_train(model, train_loader, optimizer, criterion, device)
+     save_model(model,optimizer,folder_path='checkpoint')
+
+
+

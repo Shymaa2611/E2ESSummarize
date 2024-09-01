@@ -7,7 +7,7 @@ from torch.nn.utils.rnn import pad_sequence
 import numpy as np
 
 class SpeechDataset(Dataset):
-    def __init__(self, audio_dir, text_dir, summary_dir, processor=None, tokenizer=None, embedding_model=None, segment_length=15):
+    def __init__(self, audio_dir, text_dir, summary_dir, processor=None, tokenizer=None, embedding_model=None, segment_length=15, stage=1):
         self.audio_dir = audio_dir
         self.text_dir = text_dir
         self.summary_dir = summary_dir
@@ -18,6 +18,7 @@ class SpeechDataset(Dataset):
         self.text_files = sorted(os.listdir(text_dir))
         self.summary_files = sorted(os.listdir(summary_dir))
         self.segment_length = segment_length * 1000
+        self.stage = stage  # Adding stage to dataset
 
         assert len(self.audio_files) == len(self.text_files) == len(self.summary_files), "Mismatched dataset lengths!"
 
@@ -61,17 +62,21 @@ class SpeechDataset(Dataset):
         except Exception as e:
             print(f"Error loading text or summary file: {e}")
             return None
+        
         text_tokens = self.tokenizer(text, return_tensors='pt', padding=True, truncation=True)
         summary_tokens = self.tokenizer(summary, return_tensors='pt', padding=True, truncation=True)
         
         with torch.no_grad():
-            text_embeddings = self.embedding_model(**text_tokens).last_hidden_state.mean(dim=1)  # Mean pooling
+            text_embeddings = self.embedding_model(**text_tokens).last_hidden_state.mean(dim=1)
             summary_embeddings = self.embedding_model(**summary_tokens).last_hidden_state.mean(dim=1)
         
+        # Include segment positional embeddings if in Stage 2 or 3
+        if self.stage > 1:
+            segment_pos_embeddings = torch.arange(len(segments)).unsqueeze(1)
+            audio_inputs = audio_inputs + segment_pos_embeddings
+
         return {
             'audio_inputs': audio_inputs, 
-            'text': text,
-            'summary': summary,
             'text_embeddings': text_embeddings.squeeze(0), 
             'summary_embeddings': summary_embeddings.squeeze(0)
         }
@@ -82,8 +87,6 @@ def collate_fn(batch):
         return None
     
     audio_inputs = [item['audio_inputs'] for item in batch]
-    texts = [item['text'] for item in batch]
-    summaries = [item['summary'] for item in batch]
     text_embeddings = [item['text_embeddings'] for item in batch]
     summary_embeddings = [item['summary_embeddings'] for item in batch]
     audio_inputs = pad_sequence(audio_inputs, batch_first=True)
@@ -92,14 +95,12 @@ def collate_fn(batch):
     
     return {
         'audio_inputs': audio_inputs,
-        'texts': texts,
-        'summaries': summaries,
         'text_embeddings': text_embeddings,
         'summary_embeddings': summary_embeddings
     }
 
-def get_data_loaders(batch_size=8, shuffle=True, audio_dir='data/audio', text_dir='data/text', summary_dir='data/summary', validation_split=0.2):
-    dataset = SpeechDataset(audio_dir=audio_dir, text_dir=text_dir, summary_dir=summary_dir)
+def get_data_loaders(batch_size=8, shuffle=True, audio_dir='data/audio', text_dir='data/text', summary_dir='data/summary', validation_split=0.2, stage=1):
+    dataset = SpeechDataset(audio_dir=audio_dir, text_dir=text_dir, summary_dir=summary_dir, stage=stage)
     dataset_size = len(dataset)
     val_size = max(int(validation_split * dataset_size), 1)
     train_size = dataset_size - val_size
@@ -114,8 +115,7 @@ def get_data_loaders(batch_size=8, shuffle=True, audio_dir='data/audio', text_di
     
     return train_loader, val_loader
 
-train_loader, val_loader = get_data_loaders()
 
-for data in train_loader:
-    if data:
-        print(data) 
+data,_=get_data_loaders()
+for d in data:
+    print(d)
