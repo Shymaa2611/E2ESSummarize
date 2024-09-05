@@ -13,7 +13,7 @@ def stage_1_train(model, train_loader, optimizer, criterion, device):
         
         optimizer.zero_grad()
         logits = model(audio_input, text_embeddings, summary_embeddings)
-        loss = criterion(logits, summary_embeddings)
+        loss = criterion(logits,text_embeddings)
         loss.backward()
         optimizer.step()
 
@@ -70,9 +70,8 @@ def train():
     model = SpeechToTextSummarizer().to(device)
     optimizer = optim.Adam(model.parameters(), lr=1e-4)
     criterion = nn.MSELoss()  
-    print("Train")
     train_loader, _ = get_data_loaders()
-
+    
     
     stage_1_train(model, train_loader, optimizer, criterion, device)
     stage_2_train(model, train_loader, optimizer, criterion, device)

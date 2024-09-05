@@ -7,18 +7,20 @@ from torch.nn.utils.rnn import pad_sequence
 import numpy as np
 
 class SpeechDataset(Dataset):
-    def __init__(self, audio_dir, text_dir, summary_dir, processor=None, tokenizer=None, embedding_model=None, segment_length=15, stage=1):
+    def __init__(self, audio_dir, text_dir, summary_dir, processor=None, tokenizer=None, embedding_model=None, segment_length=15,stage=1):
         self.audio_dir = audio_dir
         self.text_dir = text_dir
         self.summary_dir = summary_dir
+        #load wav2vec model to encode audio
         self.processor = processor if processor else Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
+        #using bert to tokenizer summary & text
         self.tokenizer = tokenizer if tokenizer else BertTokenizer.from_pretrained("bert-base-uncased")
         self.embedding_model = embedding_model if embedding_model else BertModel.from_pretrained("bert-base-uncased")
         self.audio_files = sorted(os.listdir(audio_dir))
         self.text_files = sorted(os.listdir(text_dir))
         self.summary_files = sorted(os.listdir(summary_dir))
         self.segment_length = segment_length * 1000
-        self.stage = stage  # Adding stage to dataset
+        self.stage = stage  
 
         assert len(self.audio_files) == len(self.text_files) == len(self.summary_files), "Mismatched dataset lengths!"
 
@@ -118,4 +120,4 @@ def get_data_loaders(batch_size=8, shuffle=True, audio_dir='data/audio', text_di
 
 data,_=get_data_loaders()
 for d in data:
-    print(d)
+    print(d['audio_inputs'])
