@@ -3,7 +3,6 @@ from torch import nn, optim
 from transformers import LlamaForCausalLM, LlamaTokenizer, BitsAndBytesConfig
 from peft import LoraConfig, get_peft_model
 
-
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class QFormer(nn.Module):
@@ -26,7 +25,7 @@ class QFormer(nn.Module):
     def forward(self, x):
         # Ensure input is float32
         x = x.float()
-        
+
         # Project input features to match the expected hidden_size (d_model) if needed
         if self.feature_projection is not None:
             x = self.feature_projection(x)
@@ -34,7 +33,7 @@ class QFormer(nn.Module):
         # Ensure x is 3D: [batch_size, sequence_length, hidden_size]
         if x.dim() == 2:
             x = x.unsqueeze(0)
-            
+
         x = x.permute(1, 0, 2)  # [sequence_length, batch_size, hidden_size]
         output = self.transformer(x, x)
         output = output.permute(1, 0, 2)  # [batch_size, sequence_length, hidden_size]
@@ -71,7 +70,7 @@ class SpeechToTextSummarizer(nn.Module):
         # Cast to float32 before processing
         audio_input = audio_input.float().to(device)
         
-        # If audio_input is 2D, convert to 3D by adding a batch dimension
+        # Ensure audio_input has the correct shape: [batch_size, sequence_length, input_feature_size]
         if audio_input.dim() == 2:
             audio_input = audio_input.unsqueeze(0)
 
