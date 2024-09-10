@@ -25,16 +25,10 @@ def stage_2_train(model, train_loader, optimizer, criterion, device):
         summary_embeddings = batch['summary_embeddings'].to(device)
         
         optimizer.zero_grad()
-        
-        # Flatten the audio and text embeddings
         audio_input = audio_input.flatten(start_dim=1)
         text_embeddings = text_embeddings.flatten(start_dim=1)
-        
-        # Apply masking
         mask = (torch.rand_like(audio_input) > 0.15).float()
         audio_input *= mask
-        
-        # Flatten the text embeddings and apply masking
         text_mask = (torch.rand_like(text_embeddings) > 0.15).float()
         text_embeddings *= text_mask
 
@@ -53,8 +47,6 @@ def stage_3_train(model, train_loader, optimizer, criterion, device, curriculum_
             summary_embeddings = batch['summary_embeddings'].to(device)
             
             optimizer.zero_grad()
-            
-            # Gradually remove text features
             if step < curriculum_steps - 1:
                 logits = model(audio_input, text_embeddings, summary_embeddings)
             else:
