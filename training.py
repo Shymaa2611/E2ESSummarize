@@ -12,7 +12,7 @@ def stage_1_train(model, train_loader, optimizer, criterion, device):
         summary_embeddings = batch['summary_embeddings'].to(device)
         
         optimizer.zero_grad()
-        logits = model(audio_input, text_embeddings, summary_embeddings)
+        logits = model(audio_input, text_embeddings)
         loss = criterion(logits,text_embeddings)
         loss.backward()
         optimizer.step()
@@ -32,7 +32,7 @@ def stage_2_train(model, train_loader, optimizer, criterion, device):
         text_mask = (torch.rand_like(text_embeddings) > 0.15).float()
         text_embeddings *= text_mask
 
-        logits = model(audio_input, text_embeddings, summary_embeddings)
+        logits = model(audio_input, text_embeddings)
         
         loss = criterion(logits, summary_embeddings)
         loss.backward()
