@@ -3,6 +3,9 @@ from torch import nn, optim
 from transformers import LlamaForCausalLM, LlamaTokenizer
 from peft import LoraConfig, get_peft_model
 
+# Define the device (GPU if available, otherwise CPU)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 class QFormer(nn.Module):
     def __init__(self, hidden_size, num_attention_heads, num_layers):
         super(QFormer, self).__init__()
@@ -26,8 +29,13 @@ class SpeechToTextSummarizer(nn.Module):
                  hidden_size=768, num_attention_heads=12, num_layers=6):
         super(SpeechToTextSummarizer, self).__init__()
         self.q_former = QFormer(hidden_size=hidden_size, num_attention_heads=num_attention_heads, num_layers=num_layers)
+        self.q_former.to(device)  # Move QFormer to GPU if available
+
+        # Load the Llama tokenizer and model
         self.text_tokenizer = LlamaTokenizer.from_pretrained(llama_model_name)
         llama_model = LlamaForCausalLM.from_pretrained(llama_model_name)
+
+        # LoRA configuration for fine-tuning
         lora_config = LoraConfig(
             r=8,
             lora_alpha=32,
@@ -36,15 +44,25 @@ class SpeechToTextSummarizer(nn.Module):
             bias="none",
             task_type="CAUSAL_LM"
         )
+        # Wrap the Llama model with LoRA
         self.text_generator = get_peft_model(llama_model, lora_config)
+        self.text_generator.to(device)  # Move text generator to GPU if available
     
     def forward(self, audio_input, text_input=None):
+        # Move audio input to GPU
+        audio_input = audio_input.to(device)
+        
+        # Forward pass through QFormer
         refined_features = self.q_former(audio_input)
-        if text_input is None:
-            input_ids = self.text_tokenizer("<s>", return_tensors="pt").input_ids
-        else:
-            input_ids = self.text_tokenizer(text_input, return_tensors="pt").input_ids
-        gpt_output = self.text_generator(input_ids=input_ids, encoder_hidden_states=refined_features)
-        return gpt_output.logits
 
+        # Process text input and move to GPU if necessary
+        if text_input is None:
+            input_ids = self.text_tokenizer("<s>", return_tensors="pt").input_ids.to(device)
+        else:
+            input_ids = self.text_tokenizer(text_input, return_tensors="pt").input_ids.to(device)
+
+        # Forward pass through the text generator
+        gpt_output = self.text_generator(input_ids=input_ids, encoder_hidden_states=refined_features)
+        
+        return gpt_output.logits
 
