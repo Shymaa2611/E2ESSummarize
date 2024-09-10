@@ -7,8 +7,14 @@ from peft import LoraConfig, get_peft_model
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class QFormer(nn.Module):
-    def __init__(self, hidden_size, num_attention_heads, num_layers):
+    def __init__(self, input_feature_size, hidden_size, num_attention_heads, num_layers):
         super(QFormer, self).__init__()
+        # If input features don't match hidden_size (d_model), use a linear layer to project them
+        if input_feature_size != hidden_size:
+            self.feature_projection = nn.Linear(input_feature_size, hidden_size)
+        else:
+            self.feature_projection = None
+
         self.transformer = nn.Transformer(
             d_model=hidden_size, 
             nhead=num_attention_heads, 
@@ -18,10 +24,14 @@ class QFormer(nn.Module):
         self.weighted_sum = nn.Linear(hidden_size, hidden_size)
 
     def forward(self, x):
+        # Project input features to match the expected hidden_size (d_model) if needed
+        if self.feature_projection is not None:
+            x = self.feature_projection(x)
+
         # Ensure x is 3D: [batch_size, sequence_length, hidden_size]
         if x.dim() == 2:
-            # Add batch dimension if x is 2D
             x = x.unsqueeze(0)
+            
         x = x.permute(1, 0, 2)  # [sequence_length, batch_size, hidden_size]
         output = self.transformer(x, x)
         output = output.permute(1, 0, 2)  # [batch_size, sequence_length, hidden_size]
@@ -30,9 +40,10 @@ class QFormer(nn.Module):
 
 class SpeechToTextSummarizer(nn.Module):
     def __init__(self, llama_model_name='huggyllama/llama-7b', 
-                 hidden_size=768, num_attention_heads=12, num_layers=6):
+                 input_feature_size=512, hidden_size=768, num_attention_heads=12, num_layers=6):
         super(SpeechToTextSummarizer, self).__init__()
-        self.q_former = QFormer(hidden_size=hidden_size, num_attention_heads=num_attention_heads, num_layers=num_layers)
+        self.q_former = QFormer(input_feature_size=input_feature_size, hidden_size=hidden_size, 
+                                num_attention_heads=num_attention_heads, num_layers=num_layers)
         self.q_former.to(device)  
         
         bnb_config = BitsAndBytesConfig(
