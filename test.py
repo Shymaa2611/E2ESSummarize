@@ -1,6 +1,6 @@
 import torch
 from torch import nn, optim
-from transformers import LlamaForCausalLM, LlamaTokenizer
+from transformers import GPT2Tokenizer, GPT2LMHeadModel
 from peft import LoraConfig, get_peft_model
 
 class QFormer(nn.Module):
@@ -22,29 +22,31 @@ class QFormer(nn.Module):
         return output
 
 class SpeechToTextSummarizer(nn.Module):
-    def __init__(self, llama_model_name='huggyllama/llama-7b', 
+    def __init__(self, gpt_model_name='gpt2', 
                  hidden_size=768, num_attention_heads=12, num_layers=6):
         super(SpeechToTextSummarizer, self).__init__()
         self.q_former = QFormer(hidden_size=hidden_size, num_attention_heads=num_attention_heads, num_layers=num_layers)
-        self.text_tokenizer = LlamaTokenizer.from_pretrained(llama_model_name)
-        llama_model = LlamaForCausalLM.from_pretrained(llama_model_name)
+        self.text_tokenizer = GPT2Tokenizer.from_pretrained(gpt_model_name)
+        gpt_model = GPT2LMHeadModel.from_pretrained(gpt_model_name)
         lora_config = LoraConfig(
             r=8,
             lora_alpha=32,
-            target_modules=["q_proj", "v_proj"],
+            target_modules=["attn.c_attn", "attn.c_proj"],  # Adjust this for GPT-2
             lora_dropout=0.1,
             bias="none",
             task_type="CAUSAL_LM"
         )
-        self.text_generator = get_peft_model(llama_model, lora_config)
+        self.text_generator = get_peft_model(gpt_model, lora_config)
     
     def forward(self, audio_input, text_input=None):
         refined_features = self.q_former(audio_input)
         if text_input is None:
-            input_ids = self.text_tokenizer("<s>", return_tensors="pt").input_ids
+            input_ids = self.text_tokenizer("<|endoftext|>", return_tensors="pt").input_ids
         else:
             input_ids = self.text_tokenizer(text_input, return_tensors="pt").input_ids
         gpt_output = self.text_generator(input_ids=input_ids, encoder_hidden_states=refined_features)
         return gpt_output.logits
 
 
+model = SpeechToTextSummarizer()
+print(model)

@@ -120,4 +120,4 @@ def get_data_loaders(batch_size=8, shuffle=True, audio_dir='data/audio', text_di
 
 data,_=get_data_loaders()
 for d in data:
-    print(d['audio_inputs'])
+    print(d.shape)
