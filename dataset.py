@@ -117,7 +117,3 @@ def get_data_loaders(batch_size=8, shuffle=True, audio_dir='data/audio', text_di
     
     return train_loader, val_loader
 
-
-data,_=get_data_loaders()
-for d in data:
-    print(d.shape)
