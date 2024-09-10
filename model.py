@@ -24,6 +24,9 @@ class QFormer(nn.Module):
         self.weighted_sum = nn.Linear(hidden_size, hidden_size)
 
     def forward(self, x):
+        # Ensure input is float32
+        x = x.float()
+        
         # Project input features to match the expected hidden_size (d_model) if needed
         if self.feature_projection is not None:
             x = self.feature_projection(x)
@@ -65,17 +68,20 @@ class SpeechToTextSummarizer(nn.Module):
         self.text_generator.to(device)  
     
     def forward(self, audio_input, text_input=None):
-        audio_input = audio_input.to(device)
+        # Cast to float32 before processing
+        audio_input = audio_input.float().to(device)
         
         # If audio_input is 2D, convert to 3D by adding a batch dimension
         if audio_input.dim() == 2:
             audio_input = audio_input.unsqueeze(0)
 
         refined_features = self.q_former(audio_input)
+        
         if text_input is None:
             input_ids = self.text_tokenizer("<s>", return_tensors="pt").input_ids.to(device)
         else:
             input_ids = self.text_tokenizer(text_input, return_tensors="pt").input_ids.to(device)
+        
         output = self.text_generator(input_ids=input_ids, encoder_hidden_states=refined_features)
         
         return output.logits
